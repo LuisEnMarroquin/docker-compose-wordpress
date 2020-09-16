@@ -1,0 +1,10 @@
+# File managers
+.DS_Store
+.directory
+desktop.ini
+
+# Env
+.env
+
+# Logs
+*.log
