@@ -1,6 +1,6 @@
-# docker-compose WordPress
+# WordPress with docker-compose
 
-Deploy self hosted WordPress using Docker easily
+Deploy self hosted WordPress using Docker easier than ever
 
 ## Steps
 
