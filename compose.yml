@@ -1,0 +1,104 @@
+version: '3.8'
+
+networks:
+  external:
+    name: nginx-proxy
+  internal:
+    internal: true
+
+volumes:
+  certs:
+  dhpar:
+  htmls:
+  vhost:
+  mysql:
+  wrdps:
+
+services:
+  nginx:
+    container_name: proxy_nginx
+    image: jwilder/nginx-proxy
+    networks:
+      - external
+    ports:
+      - 80:80
+      - 443:443
+    restart: unless-stopped
+    volumes:
+      - certs:/etc/nginx/certs
+      - dhpar:/etc/nginx/dhparam
+      - vhost:/etc/nginx/vhost.d
+      - htmls:/usr/share/nginx/html
+      - /var/run/docker.sock:/tmp/docker.sock:ro
+  letsencrypt:
+    container_name: proxy_letsencrypt
+    depends_on:
+      - nginx
+    environment:
+      DEFAULT_EMAIL: ${CERT_EMAIL}
+      NGINX_PROXY_CONTAINER: proxy_nginx
+    image: jrcs/letsencrypt-nginx-proxy-companion
+    networks:
+      - external
+    restart: unless-stopped
+    volumes:
+      - certs:/etc/nginx/certs
+      - vhost:/etc/nginx/vhost.d
+      - htmls:/usr/share/nginx/html
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+  mysql: # Database service name
+    container_name: service_mysql
+    depends_on:
+      - letsencrypt
+    environment:
+      MYSQL_USER: ${WP_USER:-admin}
+      MYSQL_DATABASE: ${WP_DATABASE:-default_db}
+      MYSQL_PASSWORD: ${WP_PASS:-12345678}
+      MYSQL_ROOT_PASSWORD: ${WP_ROOT:-root_pass}
+    image: mysql:5.7
+    networks:
+      - internal
+    ports:
+      - 3306:3306
+    restart: unless-stopped
+    volumes:
+      - mysql:/var/lib/mysql
+  wordpress:
+    container_name: service_wordpress
+    depends_on:
+      - mysql
+    environment:
+      WORDPRESS_DB_NAME: ${WP_DATABASE:-default_db}
+      WORDPRESS_DB_HOST: mysql # Database service name
+      WORDPRESS_DB_USER: ${WP_USER:-admin}
+      WORDPRESS_DB_PASSWORD: ${WP_PASS:-12345678}
+      VIRTUAL_HOST: ${URL_WP}
+      LETSENCRYPT_HOST: ${URL_WP}
+    image: wordpress
+    ports:
+      - 8000
+    networks:
+      - external
+      - internal
+    restart: unless-stopped
+    volumes:
+      - wrdps:/var/www/html
+  phpmyadmin:
+    container_name: service_phpmyadmin
+    depends_on:
+      - wordpress
+    environment:
+      PMA_HOST: mysql:3306 # Database service name : database port
+      PMA_ARBITRARY: 1 # This will run phpMyAdmin with arbitrary server, allowing you to specify server on login page
+      MYSQL_USER: ${WP_USER:-admin}
+      MYSQL_PASSWORD: ${WP_PASS:-12345678}
+      MYSQL_ROOT_PASSWORD: ${WP_ROOTUSER:-root_pass}
+      VIRTUAL_HOST: ${URL_DB}
+      LETSENCRYPT_HOST: ${URL_DB}
+    image: phpmyadmin/phpmyadmin
+    networks:
+      - external
+      - internal
+    ports:
+      - 9000
+    restart: unless-stopped
